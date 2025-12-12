@@ -897,7 +897,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.2.1',
+    version: '1.2.2',
   },
   {
     capabilities: {
