@@ -1,7 +1,10 @@
 # Dependencies
 node_modules/
 
-#docs
+# Build output
+/dist
+
+# Docs output
 /docs
 
 # Logs

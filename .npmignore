@@ -3,6 +3,10 @@
 .gitignore
 .DS_Store
 
+# Source files (we ship compiled dist/)
+src/
+tsconfig.json
+
 # Output directories
 docs/
 node_modules/
@@ -21,7 +25,7 @@ npm-debug.log*
 .env
 .env.*
 
-# Build artifacts
-dist/
-build/
+# Old JS files
+mcp-server.js
+scraper.js
 

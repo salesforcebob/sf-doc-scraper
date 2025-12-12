@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 import fs from 'fs/promises';
@@ -21,52 +21,67 @@ turndownService.use(gfm);
 // Add custom rules for better code block handling
 turndownService.addRule('codeBlocks', {
   filter: ['pre'],
-  replacement: function (content, node) {
-    const code = node.querySelector('code');
+  replacement: function (_content: string, node: Node) {
+    const element = node as HTMLPreElement;
+    const code = element.querySelector('code');
     const language = code?.className?.match(/language-(\w+)/)?.[1] || '';
-    const codeContent = code?.textContent || node.textContent;
+    const codeContent = code?.textContent || element.textContent || '';
     return `\n\`\`\`${language}\n${codeContent}\n\`\`\`\n`;
   },
 });
 
 /**
  * Sanitize a string for use as a filename
- * @param {string} text - The text to sanitize
- * @returns {string} - Sanitized filename
  */
-function sanitizeFilename(text) {
+function sanitizeFilename(text: string): string {
   return text
     .trim()
     .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
-    .replace(/\s+/g, '-')          // Replace spaces with hyphens
-    .replace(/-+/g, '-')           // Collapse multiple hyphens
-    .replace(/^-|-$/g, '')         // Remove leading/trailing hyphens
-    .substring(0, 100);            // Limit length
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Collapse multiple hyphens
+    .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+    .substring(0, 100); // Limit length
+}
+
+interface ExtractResult {
+  title: string;
+  html: string;
+  pageType?: string;
+  error?: string;
+}
+
+interface ContentResult {
+  title: string;
+  markdown: string;
+}
+
+interface ProcessResult {
+  url: string;
+  success: boolean;
+  title?: string;
+  filename?: string;
+  error?: string;
 }
 
 /**
  * Extract content from a single URL
- * 
+ *
  * Salesforce docs have two different page structures:
- * 
+ *
  * 1. GUIDE PAGES (/guide/*):
  *    - Use doc-content-layout element directly
  *    - Content is in shadow DOM slot at .content-body slot
  *    - Need to get assigned elements from the slot
- * 
+ *
  * 2. REFERENCE PAGES (/references/*):
  *    - Use doc-amf-reference element
  *    - Contains doc-content-layout in its shadow DOM
  *    - Content is in div.markdown-content in light DOM
- * 
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} url - URL to scrape
- * @returns {Promise<{title: string, markdown: string}>}
  */
-async function extractContent(page, url) {
-  await page.goto(url, { 
+async function extractContent(page: Page, url: string): Promise<ContentResult> {
+  await page.goto(url, {
     waitUntil: 'networkidle2',
-    timeout: 60000 
+    timeout: 60000,
   });
 
   // Wait for either page type to load
@@ -76,44 +91,45 @@ async function extractContent(page, url) {
   ]);
 
   // Give extra time for shadow DOM content to render
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   // Extract the content from the page
-  const result = await page.evaluate(() => {
+  const result: ExtractResult = await page.evaluate(() => {
     /**
-     * Extract readable HTML from an element, 
+     * Extract readable HTML from an element,
      * piercing shadow DOMs and resolving custom elements
      */
-    function extractReadableHTML(element) {
+    function extractReadableHTML(element: Element): string {
       if (!element) return '';
-      
+
       const tagName = element.tagName?.toLowerCase();
-      
+
       // Handle doc-heading elements (nested shadow DOM for headings)
       if (tagName === 'doc-heading') {
         const headingEl = element.shadowRoot?.querySelector('h2, h3, h4');
         const headingContent = element.shadowRoot?.querySelector('doc-heading-content');
-        const titleSpan = headingContent?.shadowRoot?.querySelector('.title');
+        const titleSpan = (headingContent as Element | null)?.shadowRoot?.querySelector('.title');
         // Also check the header attribute as fallback
-        const headingText = titleSpan?.textContent?.trim() || element.getAttribute('header') || '';
+        const headingText =
+          titleSpan?.textContent?.trim() || element.getAttribute('header') || '';
         const level = headingEl?.tagName?.toLowerCase() || 'h2';
         return `<${level}>${headingText}</${level}>`;
       }
-      
+
       // Handle doc-content-callout elements (tips, notes, etc.)
       if (tagName === 'doc-content-callout') {
         const shadowDiv = element.shadowRoot?.querySelector('.dx-callout');
         const isTip = shadowDiv?.classList?.contains('dx-callout-tip');
         const isWarning = shadowDiv?.classList?.contains('dx-callout-warning');
-        
+
         let calloutType = 'Note';
         if (isTip) calloutType = 'Tip';
         if (isWarning) calloutType = 'Warning';
-        
+
         const slottedContent = element.innerHTML;
         return `<blockquote><strong>${calloutType}:</strong> ${slottedContent}</blockquote>`;
       }
-      
+
       // Handle dx-code-block elements (code snippets in reference pages)
       if (tagName === 'dx-code-block') {
         const language = element.getAttribute('language') || '';
@@ -126,7 +142,7 @@ async function extractContent(page, url) {
           .replace(/&amp;/g, '&');
         return `<pre><code class="language-${language}">${decodedCode}</code></pre>`;
       }
-      
+
       // Handle div.custom-code-block wrapper (contains dx-code-block)
       if (tagName === 'div' && element.classList?.contains('custom-code-block')) {
         const codeBlock = element.querySelector('dx-code-block');
@@ -134,21 +150,21 @@ async function extractContent(page, url) {
           return extractReadableHTML(codeBlock);
         }
       }
-      
+
       // For regular elements, return their HTML as-is
       return element.outerHTML;
     }
-    
+
     /**
      * Process all children of a container, extracting readable HTML
      */
-    function processChildren(container) {
+    function processChildren(container: Element): { title: string; html: string } {
       let fullHTML = '';
       let title = 'Untitled';
-      
-      for (const el of container.children) {
+
+      for (const el of Array.from(container.children)) {
         const tagName = el.tagName?.toLowerCase();
-        
+
         // Capture the h1 for the title
         if (tagName === 'h1') {
           title = el.textContent?.trim() || title;
@@ -157,10 +173,10 @@ async function extractContent(page, url) {
           fullHTML += extractReadableHTML(el);
         }
       }
-      
+
       return { title, html: fullHTML };
     }
-    
+
     // =========================================
     // Try REFERENCE PAGE structure first
     // (doc-amf-reference with div.markdown-content)
@@ -172,20 +188,20 @@ async function extractContent(page, url) {
         return processChildren(markdownContent);
       }
     }
-    
+
     // =========================================
     // Try GUIDE PAGE structure
     // (doc-content-layout with .content-body slot)
     // =========================================
     const docLayout = document.querySelector('doc-content-layout');
     if (docLayout?.shadowRoot) {
-      const slot = docLayout.shadowRoot.querySelector('.content-body slot');
+      const slot = docLayout.shadowRoot.querySelector('.content-body slot') as HTMLSlotElement | null;
       if (slot) {
         const assignedElements = slot.assignedElements();
         if (assignedElements.length > 0) {
           let fullHTML = '';
           let title = 'Untitled';
-          
+
           for (const el of assignedElements) {
             const tagName = el.tagName?.toLowerCase();
             if (tagName === 'h1') {
@@ -195,40 +211,40 @@ async function extractContent(page, url) {
               fullHTML += extractReadableHTML(el);
             }
           }
-          
+
           return { title, html: fullHTML };
         }
       }
     }
-    
+
     // =========================================
     // Fallback: try to find any h1 and main content
     // =========================================
     const h1 = document.querySelector('h1');
     const main = document.querySelector('main');
-    
+
     if (main) {
       return {
         title: h1?.textContent?.trim() || 'Untitled',
         html: main.innerHTML,
-        pageType: 'fallback'
+        pageType: 'fallback',
       };
     }
-    
-    return { 
-      title: 'Untitled', 
-      html: '', 
-      error: 'Could not find content structure' 
+
+    return {
+      title: 'Untitled',
+      html: '',
+      error: 'Could not find content structure',
     };
   });
 
   if (result.error) {
     console.log(`Warning: ${result.error}`);
   }
-  
+
   // Convert HTML to Markdown
   const markdown = turndownService.turndown(result.html);
-  
+
   return {
     title: result.title,
     markdown: markdown,
@@ -237,10 +253,8 @@ async function extractContent(page, url) {
 
 /**
  * Create a configured browser page
- * @param {import('puppeteer').Browser} browser 
- * @returns {Promise<import('puppeteer').Page>}
  */
-async function createPage(browser) {
+async function createPage(browser: Browser): Promise<Page> {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });
   await page.setUserAgent(
@@ -251,40 +265,41 @@ async function createPage(browser) {
 
 /**
  * Process a single URL with a given page
- * @param {import('puppeteer').Page} page 
- * @param {string} url 
- * @param {string} outputDir 
- * @returns {Promise<{url: string, success: boolean, title?: string, filename?: string, error?: string}>}
  */
-async function processUrl(page, url, outputDir) {
+async function processUrl(
+  page: Page,
+  url: string,
+  outputDir: string
+): Promise<ProcessResult> {
   try {
     const { title, markdown } = await extractContent(page, url);
-    
+
     const filename = `${sanitizeFilename(title)}.md`;
     const filepath = path.join(outputDir, filename);
-    
+
     await fs.writeFile(filepath, markdown, 'utf-8');
-    
+
     console.log(`✓ Saved: ${filename}`);
     return { url, title, filename, success: true };
-    
   } catch (error) {
-    console.error(`✗ Failed: ${url.split('/').pop()} - ${error.message}`);
-    return { url, success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`✗ Failed: ${url.split('/').pop()} - ${errorMessage}`);
+    return { url, success: false, error: errorMessage };
   }
 }
 
 /**
  * Process a list of URLs and save markdown files
  * Uses parallel processing with configurable concurrency
- * @param {string[]} urls - Array of URLs to process
- * @param {string} outputDir - Output directory for markdown files
- * @param {number} concurrency - Number of parallel pages (default: 10)
  */
-async function processUrls(urls, outputDir, concurrency = 10) {
+async function processUrls(
+  urls: string[],
+  outputDir: string,
+  concurrency: number = 10
+): Promise<ProcessResult[]> {
   // Ensure output directory exists
   await fs.mkdir(outputDir, { recursive: true });
-  
+
   console.log(`Starting scraper for ${urls.length} URL(s)...`);
   console.log(`Concurrency: ${concurrency} parallel pages`);
   console.log(`Output directory: ${outputDir}\n`);
@@ -298,49 +313,49 @@ async function processUrls(urls, outputDir, concurrency = 10) {
   const pages = await Promise.all(
     Array.from({ length: concurrency }, () => createPage(browser))
   );
-  
+
   console.log(`Created ${pages.length} browser pages\n`);
 
-  const results = [];
+  const results: ProcessResult[] = [];
   let urlIndex = 0;
 
   // Worker function that processes URLs from the queue
-  async function worker(page, workerId) {
+  async function worker(page: Page, workerId: number): Promise<void> {
     while (urlIndex < urls.length) {
       const currentIndex = urlIndex++;
       const url = urls[currentIndex];
-      
+
       const progress = `[${currentIndex + 1}/${urls.length}]`;
       console.log(`${progress} Worker ${workerId}: Processing ${url.split('/').pop() || url}`);
-      
+
       const result = await processUrl(page, url, outputDir);
       results.push(result);
     }
   }
 
   // Start all workers
-  await Promise.all(
-    pages.map((page, index) => worker(page, index + 1))
-  );
+  await Promise.all(pages.map((page, index) => worker(page, index + 1)));
 
   // Close all pages and browser
-  await Promise.all(pages.map(page => page.close()));
+  await Promise.all(pages.map((page) => page.close()));
   await browser.close();
-  
+
   // Print summary
   console.log('\n--- Summary ---');
-  const successful = results.filter(r => r.success).length;
+  const successful = results.filter((r) => r.success).length;
   console.log(`Processed: ${results.length} URLs`);
   console.log(`Successful: ${successful}`);
   console.log(`Failed: ${results.length - successful}`);
-  
-  if (results.some(r => !r.success)) {
+
+  if (results.some((r) => !r.success)) {
     console.log('\nFailed URLs:');
-    results.filter(r => !r.success).forEach(r => {
-      console.log(`  - ${r.url}: ${r.error}`);
-    });
+    results
+      .filter((r) => !r.success)
+      .forEach((r) => {
+        console.log(`  - ${r.url}: ${r.error}`);
+      });
   }
-  
+
   return results;
 }
 
@@ -349,7 +364,7 @@ async function processUrls(urls, outputDir, concurrency = 10) {
 // ============================================
 
 // List of URLs to scrape - add more URLs here
-const urls = [
+const urls: string[] = [
   'https://developer.salesforce.com/docs/einstein/genai',
   'https://developer.salesforce.com/docs/einstein/genai/overview',
   'https://developer.salesforce.com/docs/einstein/genai/guide',
@@ -613,15 +628,15 @@ const urls = [
 ];
 
 // Output directory
-const docsDir = path.join(__dirname, 'docs');
+const docsDir = path.join(__dirname, '..', 'docs');
 
 // Run the scraper
 processUrls(urls, docsDir)
-  .then(results => {
+  .then(() => {
     console.log('\nScraping complete!');
     process.exit(0);
   })
-  .catch(error => {
+  .catch((error) => {
     console.error('Fatal error:', error);
     process.exit(1);
   });
