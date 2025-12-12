@@ -15,10 +15,10 @@
   "stack": "heroku-24",
   "buildpacks": [
     {
-      "url": "heroku/nodejs"
+      "url": "https://github.com/jontewks/puppeteer-heroku-buildpack.git"
     },
     {
-      "url": "https://buildpack-registry.s3.amazonaws.com/buildpacks/jontewks/puppeteer.tgz"
+      "url": "heroku/nodejs"
     }
   ],
   "env": {
@@ -32,7 +32,7 @@
     },
     "PUPPETEER_EXECUTABLE_PATH": {
       "description": "Path to Chrome installed by buildpack",
-      "value": "/app/.apt/usr/bin/google-chrome"
+      "value": "/app/.chrome-for-testing/chrome-linux64/chrome"
     }
   },
   "formation": {

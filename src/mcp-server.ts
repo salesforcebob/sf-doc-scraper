@@ -53,10 +53,17 @@ let browser: Browser | null = null;
  */
 async function getBrowser(): Promise<Browser> {
   if (!browser) {
-    browser = await puppeteer.launch({
+    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    };
+    
+    // Use Chrome from Heroku buildpack if available
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    
+    browser = await puppeteer.launch(launchOptions);
   }
   return browser;
 }
@@ -948,7 +955,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.3.2',
+    version: '1.3.3',
   },
   {
     capabilities: {
@@ -1256,7 +1263,7 @@ async function startHttpServer(): Promise<void> {
 
   // Health check endpoint
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ ok: true, version: '1.3.2', name: 'sf-docs-mcp-server' });
+    res.json({ ok: true, version: '1.3.3', name: 'sf-docs-mcp-server' });
   });
 
   // Documentation endpoint
