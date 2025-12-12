@@ -315,7 +315,22 @@ async function analyzePageStructure(url: string): Promise<PageAnalysis> {
         }
       }
 
-      // 4. Fallback - check for main content area
+      // 4. Check for OVERVIEW page structure (landing pages)
+      const groupText = document.querySelector('dx-group-text');
+      if (groupText?.shadowRoot) {
+        result.pageType = 'overview';
+        const titleEl = groupText.shadowRoot.querySelector('.title');
+        const bodyEl = groupText.shadowRoot.querySelector('.body');
+        const preview = (titleEl?.textContent?.trim() || '') + ': ' + (bodyEl?.textContent?.trim()?.substring(0, 100) || '');
+        result.contentContainers.push({
+          selector: 'dx-group-text',
+          description: 'Overview/landing page with title and description',
+          hasContent: true,
+          contentPreview: preview,
+        });
+      }
+
+      // 5. Fallback - check for main content area
       const main = document.querySelector('main');
       if (main) {
         result.contentContainers.push({
@@ -862,6 +877,40 @@ async function extractDefault(page: Page): Promise<ContentResult> {
       }
     }
 
+    // Try OVERVIEW PAGE structure (landing pages with dx-group-text, dx-features-list)
+    const groupText = document.querySelector('dx-group-text');
+    if (groupText?.shadowRoot) {
+      const shadowContent = groupText.shadowRoot;
+      const titleEl = shadowContent.querySelector('.title');
+      const bodyEl = shadowContent.querySelector('.body');
+
+      const title = titleEl?.textContent?.trim() || 'Overview';
+      let html = `<h1>${title}</h1>`;
+
+      if (bodyEl) {
+        html += `<p>${bodyEl.textContent?.trim()}</p>`;
+      }
+
+      // Get features list if present
+      const featuresList = document.querySelector('dx-features-list');
+      if (featuresList?.shadowRoot) {
+        const features = featuresList.shadowRoot.querySelectorAll('li.option');
+        if (features.length > 0) {
+          html += '<h2>Features</h2><ul>';
+          features.forEach((feature) => {
+            const featureTitle = feature.querySelector('.dx-text-display-8')?.textContent?.trim();
+            const featureDesc = feature.querySelector('.dx-text-body-2')?.textContent?.trim();
+            if (featureTitle) {
+              html += `<li><strong>${featureTitle}</strong>: ${featureDesc || ''}</li>`;
+            }
+          });
+          html += '</ul>';
+        }
+      }
+
+      return { title, html, pageType: 'overview' };
+    }
+
     // Fallback: try to find any h1 and main content
     const h1 = document.querySelector('h1');
     const main = document.querySelector('main');
@@ -897,7 +946,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.2.2',
+    version: '1.2.3',
   },
   {
     capabilities: {
