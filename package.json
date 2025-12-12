@@ -1,0 +1,29 @@
+{
+  "name": "sf-docs-scraper",
+  "version": "1.0.0",
+  "description": "Context scraper for extracting Salesforce developer / help documentation and converting to Markdown",
+  "main": "scraper.js",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scraper.js",
+    "mcp": "node mcp-server.js"
+  },
+  "bin": {
+    "sf-docs-mcp": "./mcp-server.js"
+  },
+  "keywords": [
+    "salesforce",
+    "puppeteer",
+    "scraper",
+    "documentation",
+    "mcp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "puppeteer": "^23.0.0",
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}
