@@ -270,7 +270,23 @@ async function analyzePageStructure(url: string): Promise<PageAnalysis> {
               });
             }
 
-            // Check for api-documentation (Endpoint pages)
+            // Check for api-method-documentation (Method/Endpoint pages like Send Query)
+            const apiMethodDoc = amfTopic.shadowRoot.querySelector('api-method-documentation');
+            if (apiMethodDoc?.shadowRoot) {
+              result.pageType = 'api-method';
+              const titleArea = apiMethodDoc.shadowRoot.querySelector('.title-area');
+              const arcMarked = apiMethodDoc.shadowRoot.querySelector('arc-marked');
+              const preview = (titleArea?.textContent?.trim() || '') + ': ' + (arcMarked?.textContent?.trim()?.substring(0, 100) || '');
+              result.contentContainers.push({
+                selector: 'api-method-documentation',
+                shadowPath: ['doc-amf-reference', 'doc-amf-topic', 'api-method-documentation'],
+                description: 'API Method/Endpoint documentation page',
+                hasContent: true,
+                contentPreview: preview,
+              });
+            }
+
+            // Check for api-documentation (Endpoint pages - older style)
             const apiDocs = amfTopic.shadowRoot.querySelector('api-documentation');
             if (apiDocs?.shadowRoot) {
               result.pageType = 'api-documentation';
@@ -754,6 +770,59 @@ async function extractDefault(page: Page): Promise<ContentResult> {
             return { title, html, pageType: 'api-type' };
           }
 
+          // Check for api-method-documentation (Method/Endpoint pages like Send Query)
+          // Structure: api-method-documentation (shadow) → .title-area, api-url, arc-marked, sections
+          const apiMethodDoc = amfTopic.shadowRoot.querySelector('api-method-documentation');
+          if (apiMethodDoc?.shadowRoot) {
+            const shadowContent = apiMethodDoc.shadowRoot;
+
+            // Get title from .title-area
+            const titleArea = shadowContent.querySelector('.title-area');
+            const title = titleArea?.textContent?.trim() || 'API Method';
+
+            // Get description from arc-marked (contains slotted HTML)
+            const arcMarked = shadowContent.querySelector('arc-marked');
+            let description = '';
+            if (arcMarked) {
+              description = arcMarked.innerHTML || '';
+            }
+
+            // Build HTML output
+            let html = `<h1>${title}</h1>`;
+            if (description) {
+              html += `<div class="description">${description}</div>`;
+            }
+
+            // Add section headers for Request and Response
+            const requestSection = shadowContent.querySelector('.request-documentation');
+            if (requestSection) {
+              html += '<h2>Request</h2>';
+              // Get parameters if available
+              const paramsDoc = requestSection.querySelector('api-parameters-document');
+              if (paramsDoc) {
+                const paramsSlot = paramsDoc.innerHTML;
+                if (paramsSlot) html += paramsSlot;
+              }
+              const bodyDoc = requestSection.querySelector('api-body-document');
+              if (bodyDoc) {
+                const bodySlot = bodyDoc.innerHTML;
+                if (bodySlot) html += bodySlot;
+              }
+            }
+
+            const responseSection = shadowContent.querySelector('.response-documentation');
+            if (responseSection) {
+              html += '<h2>Responses</h2>';
+              const responsesDoc = responseSection.querySelector('api-responses-document');
+              if (responsesDoc) {
+                const responsesSlot = responsesDoc.innerHTML;
+                if (responsesSlot) html += responsesSlot;
+              }
+            }
+
+            return { title, html, pageType: 'api-method' };
+          }
+
           // Check for api-documentation
           const apiDocs = amfTopic.shadowRoot.querySelector('api-documentation');
           if (apiDocs?.shadowRoot) {
@@ -828,7 +897,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.2.0',
+    version: '1.2.1',
   },
   {
     capabilities: {
