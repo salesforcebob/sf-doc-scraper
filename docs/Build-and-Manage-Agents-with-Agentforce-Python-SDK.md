@@ -1,3 +1,0 @@
-# Build and Manage Agents with Agentforce Python SDK
-
-The Agentforce Python SDK provides a programmatic way to create, manage, and deploy AI agents in Salesforce. You can also create and tune prompt templates. This SDK uses the Salesforce Metadata API from a Python-based implementation that you can incorporate into your solution. See [Agentforce Python SDK Reference](https://github.com/salesforce/agent-sdk/tree/main).
