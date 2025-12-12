@@ -948,7 +948,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.3.0',
+    version: '1.3.1',
   },
   {
     capabilities: {
@@ -1256,7 +1256,7 @@ async function startHttpServer(): Promise<void> {
 
   // Health check endpoint
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ ok: true, version: '1.3.0', name: 'sf-docs-mcp-server' });
+    res.json({ ok: true, version: '1.3.1', name: 'sf-docs-mcp-server' });
   });
 
   // Documentation endpoint
