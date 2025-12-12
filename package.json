@@ -1,19 +1,22 @@
 {
-  "name": "sf-docs-mcp-server",
-  "version": "1.0.0",
+  "name": "@salesforcebob/sf-docs-mcp-server",
+  "version": "1.0.1",
   "description": "MCP server for scraping Salesforce developer documentation and converting to Markdown. Use with Cursor, Claude Desktop, or any MCP client.",
-  "main": "mcp-server.js",
+  "main": "dist/mcp-server.js",
+  "types": "dist/mcp-server.d.ts",
   "type": "module",
   "scripts": {
-    "scrape": "node scraper.js",
-    "start": "node mcp-server.js"
+    "build": "tsc",
+    "scrape": "node dist/scraper.js",
+    "start": "node dist/mcp-server.js",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
   },
   "bin": {
-    "sf-docs-mcp": "./mcp-server.js"
+    "sf-docs-mcp": "./dist/mcp-server.js"
   },
   "files": [
-    "mcp-server.js",
-    "scraper.js",
+    "dist",
     "ReadMe.md"
   ],
   "keywords": [
@@ -26,7 +29,8 @@
     "documentation",
     "scraper",
     "puppeteer",
-    "markdown"
+    "markdown",
+    "typescript"
   ],
   "author": "Robert Ullery",
   "license": "MIT",
@@ -41,10 +45,18 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "puppeteer": "^23.0.0",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/turndown": "^5.0.4",
+    "typescript": "^5.3.0"
   }
 }

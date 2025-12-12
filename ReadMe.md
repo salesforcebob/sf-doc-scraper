@@ -5,13 +5,13 @@ An MCP (Model Context Protocol) server for scraping Salesforce developer documen
 ## Installation
 
 ```bash
-npm install -g sf-docs-mcp-server
+npm install -g @salesforcebob/sf-docs-mcp-server
 ```
 
 Or use directly with npx:
 
 ```bash
-npx sf-docs-mcp-server
+npx @salesforcebob/sf-docs-mcp-server
 ```
 
 ## Features
@@ -32,7 +32,7 @@ Add to your Cursor MCP configuration (`~/.cursor/mcp.json`):
   "mcpServers": {
     "sf-docs": {
       "command": "npx",
-      "args": ["-y", "sf-docs-mcp-server"]
+      "args": ["-y", "@salesforcebob/sf-docs-mcp-server"]
     }
   }
 }
@@ -59,7 +59,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
   "mcpServers": {
     "sf-docs": {
       "command": "npx",
-      "args": ["-y", "sf-docs-mcp-server"]
+      "args": ["-y", "@salesforcebob/sf-docs-mcp-server"]
     }
   }
 }
