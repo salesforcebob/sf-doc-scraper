@@ -1,25 +1,46 @@
 {
-  "name": "sf-docs-scraper",
+  "name": "sf-docs-mcp-server",
   "version": "1.0.0",
-  "description": "Context scraper for extracting Salesforce developer / help documentation and converting to Markdown",
-  "main": "scraper.js",
+  "description": "MCP server for scraping Salesforce developer documentation and converting to Markdown. Use with Cursor, Claude Desktop, or any MCP client.",
+  "main": "mcp-server.js",
   "type": "module",
   "scripts": {
     "scrape": "node scraper.js",
-    "mcp": "node mcp-server.js"
+    "start": "node mcp-server.js"
   },
   "bin": {
     "sf-docs-mcp": "./mcp-server.js"
   },
+  "files": [
+    "mcp-server.js",
+    "scraper.js",
+    "ReadMe.md"
+  ],
   "keywords": [
     "salesforce",
-    "puppeteer",
-    "scraper",
+    "mcp",
+    "model-context-protocol",
+    "cursor",
+    "claude",
+    "ai-assistant",
     "documentation",
-    "mcp"
+    "scraper",
+    "puppeteer",
+    "markdown"
   ],
-  "author": "",
+  "author": "Robert Ullery",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robert-ullery/sf-docs-mcp-server.git"
+  },
+  "homepage": "https://github.com/robert-ullery/sf-docs-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/robert-ullery/sf-docs-mcp-server/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "puppeteer": "^23.0.0",

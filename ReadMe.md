@@ -1,70 +1,78 @@
-# SF Dev Scraper
+# SF Docs MCP Server
 
-A Puppeteer-based scraper for extracting Salesforce developer documentation and converting it to Markdown. Available as both a batch scraping tool and an MCP server for AI agent integration.
-
-## Features
-
-- Extracts content from Salesforce developer docs (handles React/shadow DOM components)
-- Supports both guide pages (`/guide/*`) and reference pages (`/references/*`)
-- Converts HTML to clean Markdown using Turndown with GFM table support
-- Automatically names output files based on the page's h1 heading
-- Parallel processing for batch scraping (10 concurrent pages)
-- **MCP Server** for integration with Cursor and other AI assistants
+An MCP (Model Context Protocol) server for scraping Salesforce developer documentation and converting it to Markdown. Integrates with Cursor, Claude Desktop, and other MCP-compatible AI assistants.
 
 ## Installation
 
 ```bash
-npm install
+npm install -g sf-docs-mcp-server
 ```
 
-## Usage
-
-### Batch Scraping
-
-Edit the `urls` array in `scraper.js` to include the pages you want to scrape:
-
-```javascript
-const urls = [
-  'https://developer.salesforce.com/docs/einstein/genai/guide/get-started.html',
-  'https://developer.salesforce.com/docs/einstein/genai/guide/get-started-agents.html',
-  // Add more URLs here
-];
-```
-
-Then run the scraper:
+Or use directly with npx:
 
 ```bash
-npm run scrape
+npx sf-docs-mcp-server
 ```
 
-Markdown files are saved to the `docs/` directory, named after the h1 heading on each page.
+## Features
 
-### MCP Server (for Cursor/AI Agents)
+- Scrapes Salesforce developer docs (handles React/shadow DOM components)
+- Supports both guide pages (`/guide/*`) and reference pages (`/references/*`)
+- Converts HTML to clean Markdown with GFM table support
+- Runs as an MCP server for AI assistant integration
 
-The MCP server exposes a `scrape_sf_docs` tool that can be used by AI assistants to fetch documentation on-demand.
+## MCP Configuration
 
-#### Setup in Cursor
+### Cursor
 
 Add to your Cursor MCP configuration (`~/.cursor/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "sf-docs-scraper": {
-      "command": "node",
-      "args": ["/Users/robert.ullery/Workspace/SFDevScraper/mcp-server.js"]
+    "sf-docs": {
+      "command": "npx",
+      "args": ["-y", "sf-docs-mcp-server"]
     }
   }
 }
 ```
 
-#### Tool: `scrape_sf_docs`
+Or if installed globally:
+
+```json
+{
+  "mcpServers": {
+    "sf-docs": {
+      "command": "sf-docs-mcp"
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "sf-docs": {
+      "command": "npx",
+      "args": ["-y", "sf-docs-mcp-server"]
+    }
+  }
+}
+```
+
+## Available Tools
+
+### `scrape_sf_docs`
+
+Scrape a Salesforce documentation page and return the content as Markdown.
 
 **Input:**
 - `url` (string, required): The Salesforce documentation URL to scrape
-
-**Output:**
-- Title, page type, and full markdown content
 
 **Example:**
 ```
@@ -73,9 +81,14 @@ scrape_sf_docs({
 })
 ```
 
+**Output:**
+- Title of the page
+- Page type (guide, reference, or fallback)
+- Full markdown content
+
 ## How It Works
 
-The Salesforce developer docs use a React-based architecture with nested shadow DOM components. This scraper handles two page structures:
+The Salesforce developer docs use a React-based architecture with nested shadow DOM components. This server handles two page structures:
 
 ### Guide Pages (`/guide/*`)
 1. Finds `doc-content-layout` custom element
@@ -91,6 +104,28 @@ The Salesforce developer docs use a React-based architecture with nested shadow 
 - `doc-content-callout` - Tips, notes, warnings
 - `dx-code-block` - Code snippets with syntax highlighting
 
+## Batch Scraping (Optional)
+
+For batch scraping multiple pages at once, you can use the included scraper script:
+
+```javascript
+// Edit the urls array in scraper.js
+const urls = [
+  'https://developer.salesforce.com/docs/einstein/genai/guide/get-started.html',
+  // Add more URLs here
+];
+```
+
+Then run:
+```bash
+npm run scrape
+```
+
+## Requirements
+
+- Node.js >= 18.0.0
+- Chrome/Chromium (installed automatically by Puppeteer)
+
 ## Dependencies
 
 - [Puppeteer](https://pptr.dev/) - Headless browser automation
@@ -98,3 +133,6 @@ The Salesforce developer docs use a React-based architecture with nested shadow 
 - [turndown-plugin-gfm](https://github.com/mixmark-io/turndown-plugin-gfm) - GFM table support
 - [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) - MCP server implementation
 
+## License
+
+MIT
