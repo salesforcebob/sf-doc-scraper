@@ -13,11 +13,13 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import puppeteer, { Browser, Page } from 'puppeteer';
+import express, { Request, Response } from 'express';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 
@@ -946,7 +948,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.2.3',
+    version: '1.3.0',
   },
   {
     capabilities: {
@@ -1193,11 +1195,115 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start the server
-async function main(): Promise<void> {
+/**
+ * Get documentation for the MCP server
+ */
+function getDocumentation(): string {
+  return `# SF Docs MCP Server
+
+An MCP server for scraping Salesforce developer documentation and converting to Markdown.
+
+## Available Tools
+
+### scrape_sf_docs
+Scrape a Salesforce documentation page and return content as Markdown.
+
+**Parameters:**
+- url (required): The Salesforce documentation URL to scrape
+- selector (optional): CSS selector for content container
+- shadowPath (optional): Array of selectors to traverse shadow DOM
+
+### analyze_page_structure
+Analyze a page's DOM structure to find the best extraction approach.
+
+**Parameters:**
+- url (required): The Salesforce documentation URL to analyze
+
+## Supported Page Types
+- guide: Guide pages (/guide/*)
+- reference: Reference pages with markdown content
+- api-reference: API summary pages
+- api-type: Type definition pages
+- api-method: Method/endpoint pages
+- overview: Landing/overview pages
+
+## Usage
+Use scrape_sf_docs with just the URL for automatic extraction.
+If extraction fails, use analyze_page_structure first to determine the correct selector or shadowPath.
+
+## More Information
+https://github.com/salesforcebob/sf-doc-scraper
+`;
+}
+
+/**
+ * Start the server in stdio mode (default)
+ */
+async function startStdioServer(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('SF Docs MCP Server running on stdio');
+}
+
+/**
+ * Start the server in HTTP mode (for Heroku/remote deployment)
+ */
+async function startHttpServer(): Promise<void> {
+  const app = express();
+  const PORT = process.env.PORT || 3000;
+
+  app.use(express.json());
+
+  // Health check endpoint
+  app.get('/health', (_req: Request, res: Response) => {
+    res.json({ ok: true, version: '1.3.0', name: 'sf-docs-mcp-server' });
+  });
+
+  // Documentation endpoint
+  app.get('/docs', (_req: Request, res: Response) => {
+    res.json({ documentation: getDocumentation() });
+  });
+
+  // MCP HTTP endpoint
+  app.post('/mcp', async (req: Request, res: Response) => {
+    try {
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => `session-${Date.now()}`,
+      });
+
+      // Connect the transport to the server
+      await server.connect(transport);
+
+      // Handle the request
+      await transport.handleRequest(req, res, req.body);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('MCP request error:', errorMessage);
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // Start listening
+  app.listen(PORT, () => {
+    console.log(`SF Docs MCP Server running on HTTP port ${PORT}`);
+    console.log(`Health: http://localhost:${PORT}/health`);
+    console.log(`Docs: http://localhost:${PORT}/docs`);
+    console.log(`MCP: http://localhost:${PORT}/mcp`);
+  });
+}
+
+/**
+ * Main entry point
+ */
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const mode = args[0];
+
+  if (mode === 'serve' || mode === 'web') {
+    await startHttpServer();
+  } else {
+    await startStdioServer();
+  }
 }
 
 main().catch((error) => {

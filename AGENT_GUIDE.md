@@ -119,8 +119,10 @@ Recognize these Salesforce documentation page types:
 | `guide` | `/guide/*` | Shadow DOM slot pattern |
 | `reference` | `/references/*` with `.markdown-content` | Light DOM |
 | `api-reference` | `/references/*?meta=Summary` | Nested shadow DOM → api-summary |
-| `api-type` | `/references/*?meta=type:*` | Nested shadow DOM → api-type-document |
+| `api-type` | `/references/*?meta=type:*` | Nested shadow DOM → api-type-documentation |
+| `api-method` | `/references/*?meta=*` (methods) | Nested shadow DOM → api-method-documentation |
 | `api-documentation` | `/references/*?meta=*` (endpoints) | Nested shadow DOM → api-documentation |
+| `overview` | Landing pages | dx-group-text, dx-features-list |
 
 ### Rule 5: Shadow Path Traversal
 
@@ -139,7 +141,10 @@ When using `shadowPath`, understand that:
 // Type definition pages (e.g., ClientIdParam, CookieIdParam)
 ["doc-amf-reference", "doc-amf-topic", "api-type-documentation"]
 
-// Endpoint/method pages
+// Method/endpoint pages (e.g., GraphQL Send Query)
+["doc-amf-reference", "doc-amf-topic", "api-method-documentation"]
+
+// General API documentation
 ["doc-amf-reference", "doc-amf-topic", "api-documentation"]
 ```
 

@@ -1,0 +1,49 @@
+{
+  "name": "SF Docs MCP Server",
+  "description": "MCP Server for scraping Salesforce developer documentation and converting to Markdown. Handles shadow DOM, nested components, and various page structures.",
+  "repository": "https://github.com/salesforcebob/sf-doc-scraper",
+  "logo": "https://www.salesforce.com/content/dam/sfdc-docs/www/logos/logo-salesforce.svg",
+  "keywords": [
+    "mcp",
+    "salesforce",
+    "documentation",
+    "scraper",
+    "ai",
+    "claude",
+    "cursor"
+  ],
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://buildpack-registry.s3.amazonaws.com/buildpacks/jontewks/puppeteer.tgz"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": {
+      "description": "Skip Puppeteer's bundled Chromium (use buildpack's Chrome)",
+      "value": "true"
+    },
+    "PUPPETEER_EXECUTABLE_PATH": {
+      "description": "Path to Chrome installed by buildpack",
+      "value": "/app/.apt/usr/bin/google-chrome"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [],
+  "scripts": {
+    "postdeploy": "echo 'SF Docs MCP Server deployed successfully!'"
+  }
+}
+
