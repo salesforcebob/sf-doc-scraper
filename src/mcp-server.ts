@@ -955,7 +955,7 @@ async function extractDefault(page: Page): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.3.3',
+    version: '1.3.4',
   },
   {
     capabilities: {
@@ -1263,7 +1263,7 @@ async function startHttpServer(): Promise<void> {
 
   // Health check endpoint
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ ok: true, version: '1.3.3', name: 'sf-docs-mcp-server' });
+    res.json({ ok: true, version: '1.3.4', name: 'sf-docs-mcp-server' });
   });
 
   // Documentation endpoint
@@ -1306,9 +1306,10 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const mode = args[0];
 
-  if (mode === 'serve' || mode === 'web') {
+  if (mode === 'web') {
     await startHttpServer();
   } else {
+    // 'serve' or no args = STDIO mode (for Heroku MCP registration and local npm)
     await startStdioServer();
   }
 }

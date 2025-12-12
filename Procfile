@@ -1,3 +1,2 @@
-web: npm run web
-sf-docs-mcp-server: node dist/mcp-server.js serve
-
+web: node dist/mcp-server.js web
+mcp-sf-docs: node dist/mcp-server.js serve
