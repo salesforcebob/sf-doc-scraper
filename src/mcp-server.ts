@@ -181,12 +181,87 @@ async function extractContent(url: string): Promise<ContentResult> {
         return { title, html: fullHTML };
       }
 
-      // Try REFERENCE PAGE structure first
+      // Try REFERENCE PAGE structure first (markdown-based references)
       const docRef = document.querySelector('doc-amf-reference');
       if (docRef) {
         const markdownContent = docRef.querySelector('.markdown-content');
         if (markdownContent) {
           return { ...processChildren(markdownContent), pageType: 'reference' };
+        }
+
+        // Try AMF API REFERENCE structure (OpenAPI/RAML-based API docs)
+        // These use deeply nested shadow DOMs: doc-amf-reference → doc-amf-topic → api-summary
+        if (docRef.shadowRoot) {
+          const amfTopic = docRef.shadowRoot.querySelector('doc-amf-topic');
+          if (amfTopic?.shadowRoot) {
+            const apiSummary = amfTopic.shadowRoot.querySelector('api-summary');
+            if (apiSummary?.shadowRoot) {
+              // Extract the actual content, skipping CSS
+              const fullText = apiSummary.shadowRoot.textContent || '';
+              const startIndex = fullText.indexOf('API title:');
+
+              if (startIndex !== -1) {
+                const contentText = fullText.substring(startIndex);
+
+                // Parse the structured content into HTML
+                const lines = contentText.split('\n').map((l) => l.trim()).filter(Boolean);
+                let html = '';
+                let title = 'Untitled';
+                let currentSection = '';
+
+                for (const line of lines) {
+                  if (line.startsWith('API title:')) {
+                    continue; // Skip label
+                  } else if (line.startsWith('Version:')) {
+                    continue; // Skip label
+                  } else if (line.startsWith('Supported protocols')) {
+                    currentSection = 'protocols';
+                    html += '<h3>Supported Protocols</h3>';
+                  } else if (line === 'API Overview') {
+                    currentSection = 'overview';
+                    html += '<h2>API Overview</h2>';
+                  } else if (!title || title === 'Untitled') {
+                    // First non-label line is likely the title
+                    if (!line.includes(':') && line.length < 100) {
+                      title = line;
+                      html += `<h1>${line}</h1>`;
+                    }
+                  } else if (line.match(/^v\d+/)) {
+                    // Version number
+                    html += `<p><strong>Version:</strong> ${line}</p>`;
+                  } else if (currentSection === 'protocols') {
+                    html += `<p>${line}</p>`;
+                    currentSection = '';
+                  } else if (currentSection === 'overview' || line.length > 20) {
+                    // Regular content paragraph
+                    html += `<p>${line}</p>`;
+                  }
+                }
+
+                // Also try to extract the base URL from the page
+                const urlArea = apiSummary.shadowRoot.querySelector('.url-area');
+                if (urlArea) {
+                  const urlValue = urlArea.querySelector('.url-value');
+                  if (urlValue?.textContent) {
+                    html += `<h3>Base URL</h3><pre><code>${urlValue.textContent.trim()}</code></pre>`;
+                  }
+                }
+
+                return { title, html, pageType: 'api-reference' };
+              }
+            }
+
+            // Also check for api-documentation or endpoint pages
+            const apiDocs = amfTopic.shadowRoot.querySelector('api-documentation');
+            if (apiDocs?.shadowRoot) {
+              const docContent = apiDocs.shadowRoot.textContent || '';
+              return {
+                title: 'API Documentation',
+                html: `<pre>${docContent}</pre>`,
+                pageType: 'api-documentation',
+              };
+            }
+          }
         }
       }
 
@@ -253,7 +328,7 @@ async function extractContent(url: string): Promise<ContentResult> {
 const server = new Server(
   {
     name: 'sf-docs-scraper',
-    version: '1.0.1',
+    version: '1.1.0',
   },
   {
     capabilities: {
@@ -269,7 +344,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'scrape_sf_docs',
         description:
-          'Scrape a Salesforce developer documentation page and return the content as markdown. Works with both guide pages (/guide/*) and reference pages (/references/*).',
+          'Scrape a Salesforce developer documentation page and return the content as markdown. Works with guide pages (/guide/*), reference pages (/references/*), and API reference pages (OpenAPI/RAML-based like Einstein API docs).',
         inputSchema: {
           type: 'object' as const,
           properties: {
